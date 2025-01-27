@@ -1,5 +1,7 @@
 const express = require("express");
 const sql = require("mssql");
+const axios = require('axios');
+const qs = require('qs');
 require("dotenv").config();  
 
 const app = express();
@@ -14,6 +16,12 @@ let config = {
     }
 }
 
+let tokenReq = {
+    "grant_type": process.env.KU_GRANT_TYPE, 
+    "username": process.env.KU_USERNAME, 
+    "password": process.env.KU_PASSWORD
+}
+
 sql.connect(config, err => {
     if (err) {
         console.log("Database Connection Failed !!!", err.message);
@@ -24,6 +32,22 @@ sql.connect(config, err => {
 app.get("/", async (req, res) => {
     res.send("KUReview Backend Server");
 });
+
+app.get("/token", async (req, res) => {
+    axios
+    .post(process.env.KU_API_TOKEN, qs.stringify(tokenReq), {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    })
+    .then((response) => {
+        console.log('Response:', response.data);
+        res.send(response.data)
+    })
+    .catch((error) => {
+        console.error('Error:', error.response ? error.response.data : error.message);
+    });
+})
 
 app.get("/suggest", async (req, res) => {
     try {
