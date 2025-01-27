@@ -5,10 +5,10 @@ require("dotenv").config();
 const app = express();
 
 let config = {
-    "user": "sa", 
-    "password": "@KUReview123", 
-    "server": "127.0.0.1", 
-    "database": "suggestDB", 
+    "user": process.env.DB_USER, 
+    "password": process.env.DB_PASSWORD, 
+    "server": process.env.DB_SERVER, 
+    "database": process.env.DB, 
     "options": {
         "encrypt": false 
     }
