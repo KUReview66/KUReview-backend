@@ -17,7 +17,10 @@
   },
   "homepage": "https://github.com/KUReview66/KUReview-backend#readme",
   "dependencies": {
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "mssql": "^11.0.1",
+    "mysql": "^2.18.1",
     "request": "^2.88.2"
   }
 }
