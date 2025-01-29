@@ -5,6 +5,7 @@ const qs = require('qs');
 require("dotenv").config();  
 
 const app = express();
+app.use(express.json());
 
 let config = {
     "user": process.env.DB_USER, 
@@ -77,6 +78,32 @@ app.get("/suggest/:id", async (req, res) => {
         pool.close();
     } catch (err) {
         console.error('SQL error', err);
+    }
+})
+
+app.post("/suggest", async (req, res) => {
+    try {
+        const {id, round, content} = req.body;
+    
+        const pool = await sql.connect(config);
+    
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('round', sql.Int, round)
+            .input('content', sql.Text, content)
+            .query(
+                'INSERT INTO suggestContent (id, round, content) VALUES (@id, @round, @content)'
+            );
+        
+        res.status(201).send({
+            message: 'Item created successfully', 
+            id: id, 
+        })
+    } catch(err) {
+        res.status(500).send({
+            message: 'Internal server error', 
+            error: err.message
+        })
     }
 })
 
