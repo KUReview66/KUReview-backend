@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const sql = require("mssql");
 const axios = require('axios');
 const qs = require('qs');
@@ -7,6 +8,8 @@ require("dotenv").config();
 
 const app = express();
 app.use(express.json());
+
+app.use(cors({ origin: "http://localhost:3001" })); 
 
 let config = {
     "user": process.env.DB_USER, 
@@ -82,6 +85,56 @@ app.get("/student-score/topic-wise", async (req, res) => {
     }
 })
 
+app.get("/student-score/topic-wise/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+        const pool = await sql.connect(config);
+
+        const result = await pool
+            .request()
+            .input('stuID', sql.BigInt, id)
+            .query('SELECT * FROM studentScoreTopicWise WHERE stuID = @stuID');
+        if (result.recordset.length === 0) {
+            res.status(404).send({ message: "No record found with the given ID" });
+        } else {
+            res.send(result.recordset); 
+        }
+        pool.close();
+    } catch (err) {
+        console.error('SQL error', err);
+    }
+})
+
+app.post("/student-score/topic-wise", async (req, res) => {
+    try {
+        const {stuID, round, section, topicName, totalQuestion, topicScore, attempted} = req.body;
+    
+        const pool = await sql.connect(config);
+    
+        const result = await pool.request()
+            .input('stuID', sql.BigInt, stuID)
+            .input('round', sql.Int, round)
+            .input('section', sql.Int, section)
+            .input('topicName', sql.Text, topicName)
+            .input('totalQuestion', sql.Int, totalQuestion)
+            .input('topicScore', sql.Int, topicScore)
+            .input('attempted', sql.Int, attempted)
+            .query(
+                'INSERT INTO studentScoreTopicWise (stuID, round, section, topicName, totalQuestion, topicScore, attempted) VALUES (@stuID, @round, @section, @topicName, @totalQuestion, @topicScore, @attempted)'
+            );
+        
+        res.status(201).send({
+            message: 'Item created successfully', 
+            id: stuID, 
+        })
+    } catch(err) {
+        res.status(500).send({
+            message: 'Internal server error', 
+            error: err.message
+        })
+    }
+})
+
 app.get("/student-score/level-wise", async (req, res) => {
     try {
         const pool = await sql.connect(config);
@@ -90,6 +143,36 @@ app.get("/student-score/level-wise", async (req, res) => {
         pool.close();
     } catch (err) {
         console.error('SQL Error', err);
+    }
+})
+
+app.post("/student-score/level-wise", async (req, res) => {
+    try {
+        const {stuID, round, section, classification, totalQuestion, classificationScore, attemped} = req.body;
+    
+        const pool = await sql.connect(config);
+    
+        const result = await pool.request()
+            .input('stuID', sql.BigInt, stuID)
+            .input('round', sql.Int, round)
+            .input('section', sql.Int, section)
+            .input('classification', sql.Text, classification)
+            .input('totalQuestion', sql.Int, totalQuestion)
+            .input('classificationScore', sql.Int, classificationScore)
+            .input('attemped', sql.Int, attemped)
+            .query(
+                'INSERT INTO classificationLevelWise (stuID, round, section, classification, totalQuestion, classificationScore, attemped) VALUES (@stuID, @round, @section, @classification, @totalQuestion, @classificationScore, @attemped)'
+            );
+        
+        res.status(201).send({
+            message: 'Item created successfully', 
+            id: stuID, 
+        })
+    } catch(err) {
+        res.status(500).send({
+            message: 'Internal server error', 
+            error: err.message
+        })
     }
 })
 
