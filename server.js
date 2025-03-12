@@ -9,7 +9,7 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
-app.use(cors({ origin: "http://localhost:3001" })); 
+app.use(cors({ origin: "*" }));
 
 let config = {
     "user": process.env.DB_USER, 
@@ -27,6 +27,26 @@ let tokenReq = {
     "password": process.env.KU_PASSWORD
 }
 
+const encodeString = (data) => {
+    const kuPublicKey = process.env.KU_PUBLIC_KEY.replace(/\\n/gm, "\n");
+
+    return crypto
+        .publicEncrypt(
+            {
+            key: kuPublicKey,
+            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+            },
+            Buffer.from(data, "utf8")
+        )
+        .toString("base64");
+};
+
+function apiKeyGenerate () {
+    const apiKey = crypto.randomBytes(32).toString("hex");
+    process.env.KUR_APIKEY = apiKey;
+    return apiKey;
+}
+
 sql.connect(config, err => {
     if (err) {
         console.log("Database Connection Failed !!!", err.message);
@@ -34,28 +54,32 @@ sql.connect(config, err => {
     console.log("Connection Successful!");
 });
 
-function encryptAES(text, key) {
-    const iv = crypto.randomBytes(16); 
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
-    let encrypted = cipher.update(text, 'utf8', 'base64');
-    encrypted += cipher.final('base64');
-    
-    return iv.toString('base64') + ':' + encrypted; 
-}
-
 app.get("/", async (req, res) => {
     res.send("KUReview Backend Server");
-    const key = crypto.randomBytes(32).toString('hex'); 
-    const plaintext = "b6410545509";
-
-    const encryptedText = encryptAES(plaintext, key);
-    // res.send(encryptedText, key)
-    console.log("Encrypted:", encryptedText);
-    console.log("Key (keep this safe!):", key);
 });
 
 app.post("/login", async (req, res) => {
-    const {username, password} = req.body;
+    const appKey = process.env.KU_APP_KEY;
+
+    const encodedBody = {
+        username: encodeString(req.body.username),
+        password: encodeString(req.body.password),
+    };
+
+    axios
+    .post(process.env.KU_LOGIN, encodedBody, {
+        headers: {
+            "app-key": appKey,
+        },
+    })
+    .then((response) => {
+        console.log(response.data);
+        res.json(response.data)
+    })
+    .catch((error) => {
+        console.error('Error:', error.response ? error.response.data : error.message);
+    });
+
 })
 
 app.get("/token", async (req, res) => {
@@ -72,6 +96,18 @@ app.get("/token", async (req, res) => {
     .catch((error) => {
         console.error('Error:', error.response ? error.response.data : error.message);
     });
+})
+
+app.post("/kureview/token", async (req, res) => {
+    const {username, password, grant} = req.body;
+    if (username === process.env.KUR_USERNAME && password === process.env.KUR_PASSWORD) {
+        if (grant === 'admin') {
+            const apiKey = apiKeyGenerate();
+            res.send({
+                apiKey: apiKey
+            })
+        }
+    }
 })
 
 app.get("/student-score/topic-wise", async (req, res) => {
