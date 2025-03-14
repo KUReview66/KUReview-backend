@@ -4,6 +4,7 @@ const sql = require("mssql");
 const axios = require('axios');
 const qs = require('qs');
 const crypto = require('crypto');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 require("dotenv").config();  
 
 const app = express();
@@ -11,15 +12,15 @@ app.use(express.json());
 
 app.use(cors({ origin: "*" }));
 
-let config = {
-    "user": process.env.DB_USER, 
-    "password": process.env.DB_PASSWORD, 
-    "server": process.env.DB_SERVER, 
-    "database": process.env.DB, 
-    "options": {
-        "encrypt": false 
+const uri = process.env.URI;
+
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
     }
-}
+});
 
 let tokenReq = {
     "grant_type": process.env.KU_GRANT_TYPE, 
@@ -47,12 +48,13 @@ function apiKeyGenerate () {
     return apiKey;
 }
 
-sql.connect(config, err => {
-    if (err) {
-        console.log("Database Connection Failed !!!", err.message);
+async function connectMongo() {
+    if (!client.topology || !client.topology.isConnected()) {
+        await client.connect();
+        console.log("Connected to MongoDB Atlas");
     }
-    console.log("Connection Successful!");
-});
+    return client.db("kureviewDB");
+}
 
 app.get("/", async (req, res) => {
     res.send("KUReview Backend Server");
@@ -66,20 +68,39 @@ app.post("/login", async (req, res) => {
         password: encodeString(req.body.password),
     };
 
-    axios
-    .post(process.env.KU_LOGIN, encodedBody, {
-        headers: {
-            "app-key": appKey,
-        },
-    })
-    .then((response) => {
-        console.log(response.data);
-        res.json(response.data)
-    })
-    .catch((error) => {
-        console.error('Error:', error.response ? error.response.data : error.message);
-    });
+    const username = req.body.username;
 
+    try {
+        const kuRes = await axios.post(process.env.KU_LOGIN, encodedBody, {
+            headers: {
+                "app-key": appKey,
+            },
+        });
+
+        const data = kuRes.data;
+        res.send(data)
+        const db = await connectMongo();
+        const studentInfoCollection = db.collection('studentInfo');
+
+        const existingStudent = await studentInfoCollection.findOne({ username });
+        if (existingStudent) {
+        console.log("User already exists in DB.");
+        } else {
+        const insertResult = await studentInfoCollection.insertOne({
+            username,
+            data,   
+            createdAt: new Date()
+        });
+        console.log('Inserted student info:', insertResult.insertedId);
+        }
+
+    } catch (error) {
+        console.error('Login error:', error.response ? error.response.data : error.message);
+        res.status(500).json({
+            message: 'Login failed',
+            error: error.response ? error.response.data : error.message,
+        });
+    }
 })
 
 app.get("/token", async (req, res) => {
@@ -111,65 +132,36 @@ app.post("/kureview/token", async (req, res) => {
 })
 
 app.get("/student-score/topic-wise", async (req, res) => {
+    const db = await connectMongo();
+    const collection = db.collection('studentScore')
     try {
-        const pool = await sql.connect(config);
-        const result = await pool.request().query('SELECT * FROM studentScoreTopicWise');
-        res.send(result.recordset);
-        pool.close();
+        const allScore = await collection.find({}).toArray();
+        res.send(allScore);
     } catch (err) {
-        console.error('SQL Error', err);
+        console.error(err);
     }
 })
 
 app.get("/student-score/topic-wise/:id", async (req, res) => {
-    const { id } = req.params;
+    const { id } = req.params; 
+    const db = await connectMongo();
+    const collection = db.collection('studentScore');
+    
     try {
-        const pool = await sql.connect(config);
+        const studentScores = await collection.find({
+            "LoginName": id
+        }).toArray();
 
-        const result = await pool
-            .request()
-            .input('stuID', sql.BigInt, id)
-            .query('SELECT * FROM studentScoreTopicWise WHERE stuID = @stuID');
-        if (result.recordset.length === 0) {
-            res.status(404).send({ message: "No record found with the given ID" });
+        if (studentScores.length === 0) {
+            res.status(404).send({ message: "No records found with that LoginName." });
         } else {
-            res.send(result.recordset); 
+            res.send(studentScores); 
         }
-        pool.close();
     } catch (err) {
-        console.error('SQL error', err);
+        console.error("Error:", err);
+        res.status(500).send({ message: "Server error." });
     }
-})
-
-app.post("/student-score/topic-wise", async (req, res) => {
-    try {
-        const {stuID, round, section, topicName, totalQuestion, topicScore, attempted} = req.body;
-    
-        const pool = await sql.connect(config);
-    
-        const result = await pool.request()
-            .input('stuID', sql.BigInt, stuID)
-            .input('round', sql.Int, round)
-            .input('section', sql.Int, section)
-            .input('topicName', sql.Text, topicName)
-            .input('totalQuestion', sql.Int, totalQuestion)
-            .input('topicScore', sql.Int, topicScore)
-            .input('attempted', sql.Int, attempted)
-            .query(
-                'INSERT INTO studentScoreTopicWise (stuID, round, section, topicName, totalQuestion, topicScore, attempted) VALUES (@stuID, @round, @section, @topicName, @totalQuestion, @topicScore, @attempted)'
-            );
-        
-        res.status(201).send({
-            message: 'Item created successfully', 
-            id: stuID, 
-        })
-    } catch(err) {
-        res.status(500).send({
-            message: 'Internal server error', 
-            error: err.message
-        })
-    }
-})
+});
 
 app.get("/student-score/level-wise", async (req, res) => {
     try {
@@ -182,113 +174,23 @@ app.get("/student-score/level-wise", async (req, res) => {
     }
 })
 
-app.post("/student-score/level-wise", async (req, res) => {
-    try {
-        const {stuID, round, section, classification, totalQuestion, classificationScore, attemped} = req.body;
-    
-        const pool = await sql.connect(config);
-    
-        const result = await pool.request()
-            .input('stuID', sql.BigInt, stuID)
-            .input('round', sql.Int, round)
-            .input('section', sql.Int, section)
-            .input('classification', sql.Text, classification)
-            .input('totalQuestion', sql.Int, totalQuestion)
-            .input('classificationScore', sql.Int, classificationScore)
-            .input('attemped', sql.Int, attemped)
-            .query(
-                'INSERT INTO classificationLevelWise (stuID, round, section, classification, totalQuestion, classificationScore, attemped) VALUES (@stuID, @round, @section, @classification, @totalQuestion, @classificationScore, @attemped)'
-            );
-        
-        res.status(201).send({
-            message: 'Item created successfully', 
-            id: stuID, 
-        })
-    } catch(err) {
-        res.status(500).send({
-            message: 'Internal server error', 
-            error: err.message
-        })
-    }
-})
-
 app.get("/suggest", async (req, res) => {
-    try {
-        const pool = await sql.connect(config);
-        const result = await pool.request().query('SELECT * FROM suggestContent');
-        res.send(result.recordset);
-        pool.close();
-    } catch (err) {
-        console.error('SQL error', err);
-    }
+    res.send('suggest api')
 })
 
 app.get("/suggest/:id", async (req, res) => {
     const { id } = req.params;
-    try {
-        const pool = await sql.connect(config);
-
-        const result = await pool
-            .request()
-            .input('id', sql.BigInt, id)
-            .query('SELECT * FROM suggestContent WHERE id = @id');
-        if (result.recordset.length === 0) {
-            res.status(404).send({ message: "No record found with the given ID" });
-        } else {
-            res.send(result.recordset); 
-        }
-        pool.close();
-    } catch (err) {
-        console.error('SQL error', err);
-    }
+    res.send(`suggest for ${id}`)
 })
 
 app.get("/suggest/:id/:round/:unit", async (req, res) => {
     const { id, round, unit } = req.params;
-    try {
-        const pool = await sql.connect(config);
-
-        const result = await pool
-            .request()
-            .input('id', sql.BigInt, id)
-            .input('round', sql.Int, round)
-            .input('unit', sql.NVarChar, unit) 
-            .query('SELECT * FROM suggestContent WHERE id = @id AND round = @round AND CAST(unit AS NVARCHAR(MAX)) = @unit');
-
-        res.send(result.recordset);
-        pool.close();
-    } catch (err) {
-        console.error('SQL error', err);
-        res.status(500).send('Internal server error');
-    }
+    res.send(`suggest for ${id}, round: ${round}, unit: ${unit}`)
 });
 
 
 app.post("/suggest", async (req, res) => {
-    try {
-        const {id, round, unit, content} = req.body;
-    
-        const pool = await sql.connect(config);
-    
-        const result = await pool.request()
-            .input('id', sql.BigInt, id)
-            .input('round', sql.Int, round)
-            .input('unit', sql.Text, unit)
-            .input('content', sql.Text, content)
-            .query(
-                'INSERT INTO suggestContent (id, round, unit, content) VALUES (@id, @round, @unit, @content)'
-            );
-        
-        res.status(201).send({
-            message: 'Item created successfully', 
-            id: id, 
-        })
-    } catch(err) {
-        res.status(500).send({
-            message: 'Internal server error', 
-            error: err.message
-        })
-    }
+    res.send('post suggest')
 })
 
 const port = 3000;
