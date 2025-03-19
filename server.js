@@ -1,6 +1,5 @@
 const express = require("express");
 const cors = require("cors");
-const sql = require("mssql");
 const axios = require('axios');
 const qs = require('qs');
 const crypto = require('crypto');
@@ -153,7 +152,7 @@ app.get("/student-score/topic-wise/:id", async (req, res) => {
         }).toArray();
 
         if (studentScores.length === 0) {
-            res.status(404).send({ message: "No records found with that LoginName." });
+            res.send({ message: "No records found with that LoginName." });
         } else {
             res.send(studentScores); 
         }
@@ -162,17 +161,6 @@ app.get("/student-score/topic-wise/:id", async (req, res) => {
         res.status(500).send({ message: "Server error." });
     }
 });
-
-app.get("/student-score/level-wise", async (req, res) => {
-    try {
-        const pool = await sql.connect(config);
-        const result = await pool.request().query('SELECT * FROM classificationLevelWise');
-        res.send(result.recordset);
-        pool.close();
-    } catch (err) {
-        console.error('SQL Error', err);
-    }
-})
 
 app.get("/suggest", async (req, res) => {
     res.send('suggest api')
