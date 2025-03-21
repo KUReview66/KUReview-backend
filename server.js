@@ -118,6 +118,26 @@ app.get("/token", async (req, res) => {
     });
 })
 
+app.get("/studentInfo/:id", async(req, res) => {
+    const { id } = req.params; 
+    const db = await connectMongo();
+    const collection = db.collection('studentInfo');
+
+    try {
+        const studentInfo = await collection.find({
+            "username": id
+        }).toArray();
+
+        if (studentInfo.length === 0) {
+            res.send({ message: "No records found with that username." });
+        } else {
+            res.send(studentInfo); 
+        }
+    } catch (err) {
+        console.error(err);
+    }
+})
+
 app.post("/kureview/token", async (req, res) => {
     const {username, password, grant} = req.body;
     if (username === process.env.KUR_USERNAME && password === process.env.KUR_PASSWORD) {
