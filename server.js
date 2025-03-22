@@ -198,7 +198,28 @@ app.get("/suggest/:id/:round/:unit", async (req, res) => {
 
 
 app.post("/suggest", async (req, res) => {
-    res.send('post suggest')
+    const { studentId, round, unit, content, quiz } = req.body;
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+
+    try {
+        const existingSuggestion = await collection.findOne({studentId, round, unit});
+        if (existingSuggestion) {
+            console.log(`Suggestion for this ${round} and ${unit} for this ${studentId} already exist`);
+        } else {
+            const insertSuggestion = await collection.insertOne({
+                studentId, 
+                round,
+                unit, 
+                content,
+                quiz, 
+                createdAt: new Date()
+            });
+            console.log(`insert suggestion: ${insertSuggestion}`)
+        }
+    } catch (err) {
+        console.log(err);
+    }
 })
 
 const port = 3000;
