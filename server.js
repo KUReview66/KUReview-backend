@@ -183,18 +183,67 @@ app.get("/student-score/topic-wise/:id", async (req, res) => {
 });
 
 app.get("/suggest", async (req, res) => {
-    res.send('suggest api')
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+
+    try {
+        const allSuggest = await collection.find({}).toArray();
+        res.send(allSuggest);
+    } catch (err) {
+        console.error(err);
+    }
 })
 
 app.get("/suggest/:id", async (req, res) => {
     const { id } = req.params;
-    res.send(`suggest for ${id}`)
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+
+    try {
+        const query = {
+            "studentId": id,
+        };
+        console.log('Query:', query); 
+
+        const studentSuggestion = await collection.find(query).toArray();
+
+        if (studentSuggestion.length === 0) {
+            res.send({ message: "No records found" });
+        } else {
+            res.send(studentSuggestion);
+        }
+    } catch (err) {
+        console.log("Error occurred: ", err);  
+        res.status(500).send({ message: "Internal server error" });
+    }
 })
 
 app.get("/suggest/:id/:round/:unit", async (req, res) => {
     const { id, round, unit } = req.params;
-    res.send(`suggest for ${id}, round: ${round}, unit: ${unit}`)
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+
+    try {
+        const query = {
+            "studentId": id,
+            "round": parseInt(round, 10),
+            "unit": parseInt(unit, 10)
+        };
+        console.log('Query:', query); 
+
+        const studentSuggestion = await collection.find(query).toArray();
+
+        if (studentSuggestion.length === 0) {
+            res.send({ message: "No records found" });
+        } else {
+            res.send(studentSuggestion);
+        }
+    } catch (err) {
+        console.log("Error occurred: ", err);  
+        res.status(500).send({ message: "Internal server error" });
+    }
 });
+
 
 
 app.post("/suggest", async (req, res) => {
