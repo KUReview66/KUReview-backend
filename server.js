@@ -226,8 +226,8 @@ app.get("/suggest/:id/:round/:unit", async (req, res) => {
     try {
         const query = {
             "studentId": id,
-            "round": parseInt(round, 10),
-            "unit": parseInt(unit, 10)
+            "round": round,
+            "unit": unit
         };
         console.log('Query:', query); 
 
