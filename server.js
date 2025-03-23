@@ -247,19 +247,20 @@ app.get("/suggest/:id/:round/:unit", async (req, res) => {
 
 
 app.post("/suggest", async (req, res) => {
-    const { studentId, round, unit, content, quiz } = req.body;
+    const { studentId, round, unit, subtopic, content, quiz } = req.body;
     const db = await connectMongo();
     const collection = db.collection('suggestion');
 
     try {
         const existingSuggestion = await collection.findOne({studentId, round, unit});
         if (existingSuggestion) {
-            console.log(`Suggestion for this ${round} and ${unit} for this ${studentId} already exist`);
+            console.log(`Suggestion for this round ${round} and unit ${unit} for this ${studentId} already exist`);
         } else {
             const insertSuggestion = await collection.insertOne({
                 studentId, 
                 round,
                 unit, 
+                subtopic,
                 content,
                 quiz, 
                 createdAt: new Date()
@@ -270,6 +271,95 @@ app.post("/suggest", async (req, res) => {
         console.log(err);
     }
 })
+
+app.get("/score/statistic/:year", async (req, res) => {
+    const { year } = req.params;
+
+    if (!year) {
+        return res.status(400).json({
+            success: false,
+        });
+    }
+    
+    try {
+        const db = await connectMongo();
+        const collection = db.collection('studentScore');
+
+        const allData = await collection.find({}).toArray();
+
+        const stats = {};
+        const targetPrefix = `b${year}`;
+
+        const filteredData = allData.filter(entry => 
+            entry.LoginName && entry.LoginName.startsWith(targetPrefix)
+        );
+
+        if (filteredData.length === 0) {
+            return res.json({
+                success: true,
+                message: `No students found for class year ${year}`
+            });
+        }
+
+    filteredData.forEach(entry => {
+        const round = entry.scheduleName;
+        const sections = entry.SectionData;
+
+        if (!stats[round]) {
+            stats[round] = {};
+        }
+
+        Object.keys(sections).forEach(sectionKey => {
+            const section = sections[sectionKey];
+            const topics = section.scoreDetail;
+
+            Object.keys(topics).forEach(topicKey => {
+                const topic = topics[topicKey];
+                const topicName = topic.topicName;
+                const topicScore = topic.topicScore;
+
+                if (!stats[round][topicName]) {
+                    stats[round][topicName] = {
+                        scores: [],
+                        average: 0,
+                        max: Number.MIN_SAFE_INTEGER,
+                        min: Number.MAX_SAFE_INTEGER
+                    };
+                }
+
+                const topicStats = stats[round][topicName];
+                topicStats.scores.push(topicScore);
+                topicStats.max = Math.max(topicStats.max, topicScore);
+                topicStats.min = Math.min(topicStats.min, topicScore);
+            });
+        });
+    });
+
+    Object.keys(stats).forEach(round => {
+        Object.keys(stats[round]).forEach(topicName => {
+        const scores = stats[round][topicName].scores;
+        const sum = scores.reduce((acc, val) => acc + val, 0);
+        stats[round][topicName].average = scores.length > 0 ? sum / scores.length : 0;
+
+        delete stats[round][topicName].scores;
+        });
+    });
+
+    res.json({
+        success: true,
+        classYear: year,
+        data: stats
+    });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
 
 const port = 3000;
 app.listen(port, () => {
