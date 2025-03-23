@@ -252,7 +252,7 @@ app.post("/suggest", async (req, res) => {
     const collection = db.collection('suggestion');
 
     try {
-        const existingSuggestion = await collection.findOne({studentId, round, unit});
+        const existingSuggestion = await collection.findOne({studentId, round, unit, subtopic});
         if (existingSuggestion) {
             console.log(`Suggestion for this round ${round} and unit ${unit} for this ${studentId} already exist`);
         } else {
