@@ -301,55 +301,82 @@ app.get("/score/statistic/:year", async (req, res) => {
             });
         }
 
-    filteredData.forEach(entry => {
-        const round = entry.scheduleName;
-        const sections = entry.SectionData;
+        const totalScores = filteredData.map(entry => {
+            const sectionScores = Object.values(entry.SectionData || {}).map(section => section.score || 0);
+            const totalScore = sectionScores.reduce((acc, val) => acc + val, 0);
+            return totalScore;
+        });
 
-        if (!stats[round]) {
-            stats[round] = {};
-        }
+        const totalSum = totalScores.reduce((acc, val) => acc + val, 0);
+        const totalAverage = totalSum / totalScores.length;
+        const totalMin = Math.min(...totalScores);
+        const totalMax = Math.max(...totalScores);
+        const variance = totalScores.reduce((acc, val) => acc + Math.pow(val - totalAverage, 2), 0) / totalScores.length;
+        const totalSD = Math.sqrt(variance);
 
-        Object.keys(sections).forEach(sectionKey => {
-            const section = sections[sectionKey];
-            const topics = section.scoreDetail;
+        const sortedScores = [...totalScores].sort((a, b) => a - b);
+        const mid = Math.floor(sortedScores.length / 2);
+        const totalMedian = sortedScores.length % 2 !== 0
+            ? sortedScores[mid]
+            : (sortedScores[mid - 1] + sortedScores[mid]) / 2;
 
-            Object.keys(topics).forEach(topicKey => {
-                const topic = topics[topicKey];
-                const topicName = topic.topicName;
-                const topicScore = topic.topicScore;
+        filteredData.forEach(entry => {
+            const round = entry.scheduleName;
+            const sections = entry.SectionData;
 
-                if (!stats[round][topicName]) {
-                    stats[round][topicName] = {
-                        scores: [],
-                        average: 0,
-                        max: Number.MIN_SAFE_INTEGER,
-                        min: Number.MAX_SAFE_INTEGER
-                    };
-                }
+            if (!stats[round]) {
+                stats[round] = {};
+            }
 
-                const topicStats = stats[round][topicName];
-                topicStats.scores.push(topicScore);
-                topicStats.max = Math.max(topicStats.max, topicScore);
-                topicStats.min = Math.min(topicStats.min, topicScore);
+            Object.keys(sections).forEach(sectionKey => {
+                const section = sections[sectionKey];
+                const topics = section.scoreDetail;
+                console.log(section.score)
+
+                Object.keys(topics).forEach(topicKey => {
+                    const topic = topics[topicKey];
+                    const topicName = topic.topicName;
+                    const topicScore = topic.topicScore;
+
+                    if (!stats[round][topicName]) {
+                        stats[round][topicName] = {
+                            scores: [],
+                            average: 0,
+                            max: Number.MIN_SAFE_INTEGER,
+                            min: Number.MAX_SAFE_INTEGER
+                        };
+                    }
+
+                    const topicStats = stats[round][topicName];
+                    topicStats.scores.push(topicScore);
+                    topicStats.max = Math.max(topicStats.max, topicScore);
+                    topicStats.min = Math.min(topicStats.min, topicScore);
+                });
             });
         });
-    });
 
-    Object.keys(stats).forEach(round => {
-        Object.keys(stats[round]).forEach(topicName => {
-        const scores = stats[round][topicName].scores;
-        const sum = scores.reduce((acc, val) => acc + val, 0);
-        stats[round][topicName].average = scores.length > 0 ? sum / scores.length : 0;
+        Object.keys(stats).forEach(round => {
+            Object.keys(stats[round]).forEach(topicName => {
+            const scores = stats[round][topicName].scores;
+            const sum = scores.reduce((acc, val) => acc + val, 0);
+            stats[round][topicName].average = scores.length > 0 ? sum / scores.length : 0;
 
-        delete stats[round][topicName].scores;
+            delete stats[round][topicName].scores;
+            });
         });
-    });
 
-    res.json({
-        success: true,
-        classYear: year,
-        data: stats
-    });
+        res.json({
+            success: true,
+            classYear: year,
+            totalScoreStatistics: {
+                average: totalAverage,
+                min: totalMin,
+                max: totalMax,
+                standardDeviation: totalSD,
+                median: totalMedian
+            },
+            data: stats
+        });
 
     } catch (error) {
         console.error(error);
