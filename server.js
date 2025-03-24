@@ -387,6 +387,49 @@ app.get("/score/statistic/:year", async (req, res) => {
     }
 });
 
+app.get("/progress/:id", async (req, res) => {
+    const {id} = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('studentStudyProgress');
+
+    try {
+        const query = {
+            "studentId": id,
+        };
+        console.log('Query:', query); 
+
+        const studentStudyProgress = await collection.find(query).toArray();
+
+        if (studentStudyProgress.length === 0) {
+            res.send({ message: "No records found" });
+        } else {
+            res.send(studentStudyProgress);
+        }
+    } catch (err) {
+        console.err(err)
+    }
+})
+
+app.post("/progress", async (req, res) => {
+    const { studentId, progress } = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('studentStudyProgress');
+
+    try {
+        const insertedProgress = await collection.insertOne({
+            studentId, 
+            progress, 
+            createdAt: new Date()
+        });
+
+        console.log(`insert progress: ${insertedProgress}`)
+    } catch (err) {
+        console.err(err)
+    }
+})
+
 
 const port = 3000;
 app.listen(port, () => {
