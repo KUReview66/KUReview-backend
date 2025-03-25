@@ -263,12 +263,97 @@ app.post("/suggest", async (req, res) => {
                 subtopic,
                 content,
                 quiz, 
+                status: 'incomplete',
                 createdAt: new Date()
             });
             console.log(`insert suggestion: ${insertSuggestion}`)
         }
     } catch (err) {
         console.log(err);
+    }
+})
+
+app.put("/suggest/:id/:round/:unit/:subtopic", async (req, res) => {
+    const { id, round, unit, subtopic } = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+
+    try {
+        const query = {
+            "studentId": id, 
+            "round": round, 
+            "unit": unit, 
+            "subtopic": subtopic, 
+        };
+
+        const update = {
+            $set: {
+                [`status`]: 'complete'
+            }
+        };
+
+        const result = await collection.updateOne(query, update);
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Student not found." });
+        }
+
+        res.json({ message: "Progress updated successfully." });
+    } catch (err) {
+        console.error(err);
+    }
+})
+
+app.delete('/suggest-delete', async (req, res) => {
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+
+    try {
+        const deleteSuggest = await collection.deleteMany({});
+        console.log('delete all complete');
+        return;
+    } catch (err) {
+        console.error(err);
+    }
+})  
+
+app.delete('/suggest-delete/:id/:round/:unit', async (req, res) => {
+    const { id, round, unit } = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+    try {
+        const query = {
+            "studentId": id, 
+            "round": round, 
+            "unit": unit, 
+        }
+        const deleteSuggest = await collection.deleteMany({query});
+        console.log(`delete suggest for ${id}, round: ${round} unit: ${unit}`);
+        return;
+    } catch (err) {
+        console.error(err)
+    }
+})
+
+app.delete('/suggest-delete/:id/:round/:unit/:subtopic', async (req, res) => {
+    const { id, round, unit, subtopic } = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+    try {
+        const query = {
+            "studentId": id, 
+            "round": round, 
+            "unit": unit, 
+            "subtopic": subtopic
+        }
+        const deleteSuggest = await collection.deleteMany({query});
+        console.log(`delete suggest for ${id}, round: ${round} unit: ${unit} subtopic: ${subtopic}`);
+        return;
+    } catch (err) {
+        console.error(err)
     }
 })
 
