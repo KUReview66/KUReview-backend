@@ -621,6 +621,51 @@ app.put('/exercise/score/:id', async (req, res) => {
     }
 })
 
+app.get("/exercise/current/:id/:unit", async (req, res) => {
+    const { id, unit } = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('currentExercise');
+
+    try {
+        const query = {
+            "studentId": id, 
+            "unit": unit
+        }
+
+        const currentExercise = await collection.find(query).toArray();
+
+        if (currentExercise.length === 0) {
+            res.send({ message: "No records found" });
+        } else {
+            res.send(currentExercise);
+        }
+    } catch(err) {
+        console.error(err);
+    }
+})
+
+app.post("/exercise/current", async (req, res) => {
+    const { studentId, unit, score, answerNKey, analytic } = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('currentExercise');
+
+    try {
+        const insertCurrentExercise = await collection.insertOne({
+            studentId, 
+            unit, 
+            score, 
+            answerNKey, 
+            analytic
+        });
+
+        console.log('insert', insertCurrentExercise);
+        res.send('POST Succesfully');
+    } catch (err) {
+        console.error(err);
+    }
+})
 
 const port = 3000;
 app.listen(port, () => {
