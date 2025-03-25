@@ -548,6 +548,74 @@ app.put("/progress/:id", async (req, res) => {
     }
 })
 
+app.get('/exercise/score/:id', async (req, res) => {
+    const { id } = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('exerciseScore');
+
+    try {
+        const query = {
+            "studentId": id
+        }
+
+        const result = await collection.find(query).toArray();
+
+        if (result.length === 0) {
+            res.send({ message: "No records found" });
+        } else {
+            res.send(result);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+})
+
+app.post('/exercise/score', async(req, res) => {
+
+    const { studentId, scoreData} = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('exerciseScore');
+
+    try {
+        const insertedScore = await collection.insertOne({
+            studentId, 
+            scoreData
+        });
+
+        console.log('insert score', insertedScore);
+        res.send('POST Success');
+    } catch(err) {
+        console.error(err);
+    }
+})
+
+app.put('/exercise/score/:id', async (req, res) => {
+    const { id } = req.params;
+    const { newScoreData } = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('exerciseScore');
+
+    try {
+        const query = {
+            "studentId": id
+        }
+
+        const update = { $push: { scoreData: newScoreData } };
+
+        const result = await collection.updateOne(query, update);
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Student not found." });
+        }
+
+        res.json({ message: "Score added successfully."});
+    } catch (err) {
+        console.error(err);
+    }
+})
+
 
 const port = 3000;
 app.listen(port, () => {
