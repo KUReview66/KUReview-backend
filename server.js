@@ -430,6 +430,39 @@ app.post("/progress", async (req, res) => {
     }
 })
 
+app.put("/progress/:id", async (req, res) => {
+    const { id } = req.params;
+    const { topicName, newProgress } = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('studentStudyProgress');
+
+    if (!topicName || newProgress === undefined) {
+        return res.status(400).json({ error: "topicName and newProgress are required." });
+    }
+
+    try {
+        const query = { "studentId": id };
+        const update = {
+            $set: {
+                [`progress.${topicName}.progress`]: newProgress
+            }
+        };
+
+        console.log(query, update);
+
+        const result = await collection.updateOne(query, update);
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Student not found." });
+        }
+
+        res.json({ message: "Progress updated successfully." });
+    } catch (err) {
+        console.error(err);
+    }
+})
+
 
 const port = 3000;
 app.listen(port, () => {
