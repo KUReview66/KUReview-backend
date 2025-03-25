@@ -329,9 +329,14 @@ app.delete('/suggest-delete/:id/:round/:unit', async (req, res) => {
             "round": round, 
             "unit": unit, 
         }
-        const deleteSuggest = await collection.deleteMany({query});
-        console.log(`delete suggest for ${id}, round: ${round} unit: ${unit}`);
-        return;
+        const deleteResult = await collection.deleteMany(query);
+        if (deleteResult.deletedCount === 0) {
+            return res.status(404).json({ error: "No matching records found to delete." });
+        }
+
+        console.log(`Deleted ${deleteResult.deletedCount} records for ${id}, round: ${round}, unit: ${unit}`);
+        res.json({ message: `Deleted ${deleteResult.deletedCount} records successfully.` });
+        
     } catch (err) {
         console.error(err)
     }
@@ -349,7 +354,7 @@ app.delete('/suggest-delete/:id/:round/:unit/:subtopic', async (req, res) => {
             "unit": unit, 
             "subtopic": subtopic
         }
-        const deleteSuggest = await collection.deleteMany({query});
+        const deleteSuggest = await collection.deleteMany(query);
         console.log(`delete suggest for ${id}, round: ${round} unit: ${unit} subtopic: ${subtopic}`);
         return;
     } catch (err) {
