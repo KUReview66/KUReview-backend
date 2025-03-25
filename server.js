@@ -421,7 +421,6 @@ app.get("/score/statistic/:year", async (req, res) => {
             Object.keys(sections).forEach(sectionKey => {
                 const section = sections[sectionKey];
                 const topics = section.scoreDetail;
-                console.log(section.score)
 
                 Object.keys(topics).forEach(topicKey => {
                     const topic = topics[topicKey];
@@ -662,6 +661,40 @@ app.post("/exercise/current", async (req, res) => {
 
         console.log('insert', insertCurrentExercise);
         res.send('POST Succesfully');
+    } catch (err) {
+        console.error(err);
+    }
+})
+
+app.put("/exercise/current/:id/:unit", async (req, res) => {
+    const { id, unit } = req.params;
+    const { score, answerNKey, analytic } = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('currentExercise'); 
+
+    try {
+        const query = {
+            "studentId": id, 
+            "unit": unit
+        };
+
+        const update = {
+            $set: {
+                score, 
+                answerNKey, 
+                analytic
+            }
+        };
+
+        const result = await collection.updateOne(query, update);
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "No matching record found." });
+        } 
+
+        res.json({ message: "Exercise updated successfully.", modifiedCount: result.modifiedCount });
+        
     } catch (err) {
         console.error(err);
     }
