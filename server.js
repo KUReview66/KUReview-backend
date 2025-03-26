@@ -428,12 +428,10 @@ app.get("/score/statistic/:year", async (req, res) => {
                 };
             }
 
-            // Calculate total score per round
             const sectionScores = Object.values(sections || {}).map(section => section.score || 0);
             const totalScore = sectionScores.reduce((acc, val) => acc + val, 0);
             roundStats[round].scores.push(totalScore);
 
-            // Process topic statistics
             Object.keys(sections).forEach(sectionKey => {
                 const section = sections[sectionKey];
                 const topics = section.scoreDetail;
@@ -460,7 +458,6 @@ app.get("/score/statistic/:year", async (req, res) => {
             });
         });
 
-        // Compute statistics for each round
         Object.keys(roundStats).forEach(round => {
             const scores = roundStats[round].scores;
             const sum = scores.reduce((acc, val) => acc + val, 0);
@@ -479,7 +476,6 @@ app.get("/score/statistic/:year", async (req, res) => {
 
             delete roundStats[round].scores;
 
-            // Compute topic-level statistics
             Object.keys(roundStats[round].topicStatistics).forEach(topicName => {
                 const topicStats = roundStats[round].topicStatistics[topicName];
                 const topicSum = topicStats.scores.reduce((acc, val) => acc + val, 0);
