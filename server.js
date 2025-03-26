@@ -601,31 +601,31 @@ app.post("/progress", async (req, res) => {
         const insertedProgress = await collection.insertOne({
             studentId, 
             progress: {
-                "basic": {
+                "02-Basic": {
                     "topicName": "02-Basic", 
                     "progress": 0
                 }, 
-                "subroutine": {
+                "03-Subroutine": {
                     "topicName": "03-Subroutine", 
                     "progress": 0
                 }, 
-                "selection": {
+                "05-Selection": {
                     "topicName": "05-Selection", 
                     "progress": 0
                 }, 
-                "repetition": {
+                "06-Repetition": {
                     "topicName": "06-Repetition", 
                     "progress": 0
                 }, 
-                "list": {
+                "07-List": {
                     "topicName": "07-List", 
                     "progress": 0
                 }, 
-                "file": {
+                "08-File": {
                     "topicName": "08-File", 
                     "progress": 0
                 }, 
-                "numpy": {
+                "09-Numpy": {
                     "topicName": "09-Numpy", 
                     "progress": 0
                 }
@@ -658,45 +658,49 @@ app.put("/progress/:id", async (req, res) => {
 
         const studentContent = await suggestionCollection.find({ "studentId": id }).toArray();
 
+        let topicCompletion = {};
+
         if (studentContent.length === 0) {
-            return res.status(404).json({ error: "No content found for this student." });
+            Object.keys(unitSubtopics).forEach(topic => {
+                topicCompletion[topic] = {
+                    topicName: topic,
+                    progress: 0
+                };
+            });
+        } else {
+            const rounds = ["comproExamR1", "comproExamR2", "comproExamR3"];
+            const latestRound = rounds.reduce((latest, round) => {
+                const roundData = studentContent.filter(entry => entry.round === round && entry.status === "complete");
+                return roundData.length > 0 && (!latest || round > latest) ? round : latest;
+            }, null);
+
+            if (!latestRound) {
+                Object.keys(unitSubtopics).forEach(topic => {
+                    topicCompletion[topic] = {
+                        topicName: topic,
+                        progress: 0
+                    };
+                });
+            } else {
+                const completedSubtopics = studentContent
+                    .filter(entry => entry.round === latestRound && entry.status === "complete")
+                    .map(entry => entry.subtopic);
+
+                Object.keys(unitSubtopics).forEach(topic => {
+                    const subtopics = unitSubtopics[topic];
+                    const completedCount = completedSubtopics.filter(sub => subtopics.includes(sub)).length;
+                    const totalSubtopics = subtopics.length;
+
+                    const progressPercentage = Math.round((completedCount / totalSubtopics) * 100) || 0;
+                    topicCompletion[topic] = {
+                        topicName: topic,
+                        progress: progressPercentage
+                    };
+                });
+            }
         }
 
-        const rounds = ["comproExamR1", "comproExamR2", "comproExamR3"];
-        const latestRound = rounds.reduce((latest, round) => {
-            const roundData = studentContent.filter(entry => entry.round === round && entry.status === "complete");
-            return roundData.length > 0 && (!latest || round > latest) ? round : latest;
-        }, null);
-
-        if (!latestRound) {
-            return res.status(404).json({ error: "No completed rounds found for this student." });
-        }
-
-        const completedSubtopics = studentContent
-            .filter(entry => entry.round === latestRound && entry.status === "complete")
-            .map(entry => entry.subtopic);
-
-        const topicCompletion = {};
-
-        Object.keys(unitSubtopics).forEach(topic => {
-            const subtopics = unitSubtopics[topic];
-            const completedCount = completedSubtopics.filter(sub => subtopics.includes(sub)).length;
-            const totalSubtopics = subtopics.length;
-
-            const progressPercentage = Math.round((completedCount / totalSubtopics) * 100) || 0;
-            topicCompletion[topic] = {
-                topicName: topic,
-                progress: progressPercentage
-            };
-        });
-
-        const updateObject = {
-            progress: {}
-        };
-
-        Object.keys(topicCompletion).forEach(topic => {
-            updateObject.progress[topic] = topicCompletion[topic];
-        });
+        const updateObject = { progress: topicCompletion };
 
         const result = await progressCollection.updateOne(
             { studentId: id },
@@ -714,6 +718,7 @@ app.put("/progress/:id", async (req, res) => {
         res.status(500).json({ error: "Internal server error." });
     }
 });
+
 
 app.get('/exercise/score/:id', async (req, res) => {
     const { id } = req.params;
