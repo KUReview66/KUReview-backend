@@ -318,6 +318,29 @@ app.delete('/suggest-delete', async (req, res) => {
     }
 })  
 
+app.delete('/suggest-delete/:id/:round', async (req, res) => {
+    const { id, round } = req.params;
+
+    const db = await connectMongo();
+    const collection = db.collection('suggestion');
+    try {
+        const query = {
+            "studentId": id, 
+            "round": round, 
+        }
+        const deleteResult = await collection.deleteMany(query);
+        if (deleteResult.deletedCount === 0) {
+            return res.status(404).json({ error: "No matching records found to delete." });
+        }
+
+        console.log(`Deleted ${deleteResult.deletedCount} records for ${id}, round: ${round}`);
+        res.json({ message: `Deleted ${deleteResult.deletedCount} records successfully.` });
+        
+    } catch (err) {
+        console.error(err)
+    }
+})
+
 app.delete('/suggest-delete/:id/:round/:unit', async (req, res) => {
     const { id, round, unit } = req.params;
 
