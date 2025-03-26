@@ -41,6 +41,71 @@ const encodeString = (data) => {
         .toString("base64");
 };
 
+const unitSubtopics = {
+    "02-Basic": [
+        "Python Statement",
+        "Arithmetic Expression",
+        "Variable",
+        "Data Types",
+        "Data Type Conversion",
+        "Input Statement",
+        "String Formatting",
+        "Output Statement and Formatting",
+    ],
+    "03-Subroutine": [
+        "Subroutine Concept",
+        "Built-in Functions",
+        "Math Module",
+        "User-defined Function",
+        "Parameter Passing",
+        "Function with Default Parameters",
+        "Value-Returning Function",
+        "Function with Returning Multiple Values",
+        "Composition",
+        "Getting Help in Python",
+        "Local and Global Variables",
+        "Positional and Named Arguments",
+    ],
+    "05-Selection": [
+        "Boolean Operators and Expression",
+        "Flowchart",
+        "If Statement",
+        "If-Else Statement",
+        "Multiple Selection Concept",
+        "Nested Conditions",
+        "Chained Conditions",
+    ],
+    "06-Repetition": [
+        "For Statement",
+        "The range() Function",
+        "While Statement",
+        "Loop and a Half",
+        "Infinite Loop",
+        "Counting Loop",
+        "Sentinel Loop",
+        "Nested Loop",
+    ],
+    "07-List": [
+        "Introduction to Collection",
+        "List Methods",
+        "Operations on List",
+        "Properties of List vs. String",
+        "List Slicing",
+    ],
+    "08-File": [
+        "Reading a Text File",
+        "Function vs. Method",
+        "List Comprehension",
+        "Nested List",
+    ],
+    "09-Numpy": [
+        "Numpy with 1D-Array",
+        "Array vs. List",
+        "Reading a Text File using Numpy",
+        "Numpy with 2D-Array",
+    ],
+};
+
 function apiKeyGenerate () {
     const apiKey = crypto.randomBytes(32).toString("hex");
     process.env.KUR_APIKEY = apiKey;
@@ -527,7 +592,7 @@ app.get("/progress/:id", async (req, res) => {
 })
 
 app.post("/progress", async (req, res) => {
-    const { studentId, progress } = req.body;
+    const { studentId } = req.body;
 
     const db = await connectMongo();
     const collection = db.collection('studentStudyProgress');
@@ -535,48 +600,120 @@ app.post("/progress", async (req, res) => {
     try {
         const insertedProgress = await collection.insertOne({
             studentId, 
-            progress, 
-            createdAt: new Date()
+            progress: {
+                "basic": {
+                    "topicName": "02-Basic", 
+                    "progress": 0
+                }, 
+                "subroutine": {
+                    "topicName": "03-Subroutine", 
+                    "progress": 0
+                }, 
+                "selection": {
+                    "topicName": "05-Selection", 
+                    "progress": 0
+                }, 
+                "repetition": {
+                    "topicName": "06-Repetition", 
+                    "progress": 0
+                }, 
+                "list": {
+                    "topicName": "07-List", 
+                    "progress": 0
+                }, 
+                "file": {
+                    "topicName": "08-File", 
+                    "progress": 0
+                }, 
+                "numpy": {
+                    "topicName": "09-Numpy", 
+                    "progress": 0
+                }
+            }, 
+            createdAt: new Date() 
         });
 
+        const insertedDocument = await collection.findOne({ _id: insertedProgress.insertedId });
+
         console.log(`insert progress: ${insertedProgress}`)
+        res.send(JSON.stringify(insertedDocument, null, 2));
     } catch (err) {
-        console.err(err)
+        console.error(err)
     }
 })
 
 app.put("/progress/:id", async (req, res) => {
     const { id } = req.params;
-    const { topicName, newProgress } = req.body;
 
     const db = await connectMongo();
-    const collection = db.collection('studentStudyProgress');
-
-    if (!topicName || newProgress === undefined) {
-        return res.status(400).json({ error: "topicName and newProgress are required." });
-    }
+    const progressCollection = db.collection('studentStudyProgress');
+    const suggestionCollection = db.collection('suggestion');
 
     try {
-        const query = { "studentId": id };
-        const update = {
-            $set: {
-                [`progress.${topicName}.progress`]: newProgress
-            }
-        };
+        const studentProgress = await progressCollection.findOne({ "studentId": id });
 
-        console.log(query, update);
-
-        const result = await collection.updateOne(query, update);
-
-        if (result.matchedCount === 0) {
+        if (!studentProgress) {
             return res.status(404).json({ error: "Student not found." });
         }
 
-        res.json({ message: "Progress updated successfully." });
+        const studentContent = await suggestionCollection.find({ "studentId": id }).toArray();
+
+        if (studentContent.length === 0) {
+            return res.status(404).json({ error: "No content found for this student." });
+        }
+
+        const rounds = ["comproExamR1", "comproExamR2", "comproExamR3"];
+        const latestRound = rounds.reduce((latest, round) => {
+            const roundData = studentContent.filter(entry => entry.round === round && entry.status === "complete");
+            return roundData.length > 0 && (!latest || round > latest) ? round : latest;
+        }, null);
+
+        if (!latestRound) {
+            return res.status(404).json({ error: "No completed rounds found for this student." });
+        }
+
+        const completedSubtopics = studentContent
+            .filter(entry => entry.round === latestRound && entry.status === "complete")
+            .map(entry => entry.subtopic);
+
+        const topicCompletion = {};
+
+        Object.keys(unitSubtopics).forEach(topic => {
+            const subtopics = unitSubtopics[topic];
+            const completedCount = completedSubtopics.filter(sub => subtopics.includes(sub)).length;
+            const totalSubtopics = subtopics.length;
+
+            const progressPercentage = Math.round((completedCount / totalSubtopics) * 100) || 0;
+            topicCompletion[topic] = {
+                topicName: topic,
+                progress: progressPercentage
+            };
+        });
+
+        const updateObject = {
+            progress: {}
+        };
+
+        Object.keys(topicCompletion).forEach(topic => {
+            updateObject.progress[topic] = topicCompletion[topic];
+        });
+
+        const result = await progressCollection.updateOne(
+            { studentId: id },
+            { $set: updateObject }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: "Student progress not found." });
+        }
+
+        res.json({ message: "Progress updated successfully.", updatedProgress: topicCompletion });
+
     } catch (err) {
         console.error(err);
+        res.status(500).json({ error: "Internal server error." });
     }
-})
+});
 
 app.get('/exercise/score/:id', async (req, res) => {
     const { id } = req.params;
