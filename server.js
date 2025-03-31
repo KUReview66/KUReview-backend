@@ -268,7 +268,6 @@ app.get("/suggest/:id", async (req, res) => {
         const query = {
             "studentId": id,
         };
-        console.log('Query:', query); 
 
         const studentSuggestion = await collection.find(query).toArray();
 
@@ -278,7 +277,7 @@ app.get("/suggest/:id", async (req, res) => {
             res.send(studentSuggestion);
         }
     } catch (err) {
-        console.log("Error occurred: ", err);  
+        console.error("Error occurred: ", err);  
         res.status(500).send({ message: "Internal server error" });
     }
 })
@@ -294,7 +293,6 @@ app.get("/suggest/:id/:round/:unit", async (req, res) => {
             "round": round,
             "unit": unit
         };
-        console.log('Query:', query); 
 
         const studentSuggestion = await collection.find(query).toArray();
 
@@ -304,7 +302,7 @@ app.get("/suggest/:id/:round/:unit", async (req, res) => {
             res.send(studentSuggestion);
         }
     } catch (err) {
-        console.log("Error occurred: ", err);  
+        console.error("Error occurred: ", err);  
         res.status(500).send({ message: "Internal server error" });
     }
 });
@@ -334,7 +332,7 @@ app.post("/suggest", async (req, res) => {
             console.log(`insert suggestion: ${insertSuggestion}`)
         }
     } catch (err) {
-        console.log(err);
+        console.error(err);
     }
 })
 
@@ -376,7 +374,7 @@ app.delete('/suggest-delete', async (req, res) => {
 
     try {
         const deleteSuggest = await collection.deleteMany({});
-        console.log('delete all complete');
+        res.send({message: "Delete all suggestion complete"})
         return;
     } catch (err) {
         console.error(err);
@@ -577,7 +575,6 @@ app.get("/progress/:id", async (req, res) => {
         const query = {
             "studentId": id,
         };
-        console.log('Query:', query); 
 
         const studentStudyProgress = await collection.find(query).toArray();
 
