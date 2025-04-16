@@ -140,7 +140,7 @@ app.post("/login", async (req, res) => {
     console.log(encodedBody)
 
     try {
-        const kuRes = await axios.post(process.env.KU_LOGIN, encodedBody, {
+        const kuRes = await axios.post("https://my.ku.th/myku/api/v2/user-login/login", encodedBody, {
             headers: {
                 "app-key": appKey,
             },
