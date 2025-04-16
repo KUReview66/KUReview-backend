@@ -137,6 +137,7 @@ app.post("/login", async (req, res) => {
     };
 
     const username = req.body.username;
+    console.log(encodedBody)
 
     try {
         const kuRes = await axios.post(process.env.KU_LOGIN, encodedBody, {
@@ -869,7 +870,38 @@ app.put("/exercise/current/:id/:unit", async (req, res) => {
     }
 })
 
-const port = 3000;
+app.get("/pre-exercise", async (req, res) => {
+    const db = await connectMongo();
+    const collection = db.collection('preExercise');
+
+    try {
+        const preExercise = await collection.find({}).toArray();
+        res.send(preExercise); 
+    } catch(err) {
+        console.error(err);
+    }
+})
+
+app.post("/pre-exercise", async (req, res) => {
+    const { answerNKey } = req.body;
+
+    const db = await connectMongo();
+    const collection = db.collection('preExercise');
+
+    try {
+        const insertCurrentExercise = await collection.insertOne({
+            answerNKey
+        });
+
+        console.log('insert', insertCurrentExercise);
+        res.send('POST Succesfully');
+    } catch (err) {
+        console.error(err);
+    }
+})
+
+
+const port = 3002;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
